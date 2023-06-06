@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 
+
 use App\Models\User;
 
 class AuthenticatedSessionController extends Controller
@@ -31,12 +32,14 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(Request $request)
     {
+        // VALIDA EMAIL Y CONTRASEÑA
         $request->validate(
             [
             'email' => 'required|string|email',
             'password' => 'required|string'
             ]);
 
+            // PETICION A LA API
             $response = Http::withHeaders([
                 'Acept' => 'aplication/json'
             ])->post('http://api.codersfree.test/v1/login', [
@@ -44,20 +47,47 @@ class AuthenticatedSessionController extends Controller
                 'password' => $request->password
             ]
         );
-        $response = $response->json();
 
+        // VERIFICA EL STATUS DIFERENTE A 404 0 DEVUELVE Y MUESTRA ERROR
+        if($response->status() == 404){
+            return back()->withErrors('These credentials do not match our records.');
+        }
+
+        // ALMACENA LA RESPUESTA JSON
+        $service = $response->json();
+
+        // UTILIZA LA INFO PARA ACTUALIZAR O CREAR REGISTRO
         $user = User::updateOrCreate([
            'email' => $request->email 
-        ], $response['data']);
-        return $user;
+        ], $service['data']);
 
-        // dd($response->json());
+        if(!$user->accessTokenphp){
+            // PETICION HTTP PARA ACCESS TOKEN
+            $response = Http::withHeaders([
+                'Accept' => 'aplication/json'
+            ])->post('http://api.codersfree.test/oauth/token', [
+                'grant_type' => 'password',
+                'client_id' => '9957a452-c219-4167-b02a-036d97716cc8',
+                'client_secret' => 'ues1nC0PFXVheXv7hitiVb3lU1J2XjGZjw9wJ8JI',
+                'username' => $request->email,
+                'password' => $request->password,
+            ]);
 
-     /*    $request->authenticate();
+            // ALMACENA LA INFORMACION
+            $access_token = $response->json(); 
 
-        $request->session()->regenerate();
+            // CREA UN NUEVO REGISTRO EN LA TABLA ACCESS_TOKEN RELACIONANDOLO CON UN DETERMINADO USUARIO
+            $user->accessToken()->create([
+                'service_id' => $service['data']['id'],
+                'access_token' => $access_token['access_token'],
+                'refresh_token' => $access_token['refresh_token'],
+                'expires_at' => now()->addSecond($access_token['expires_in'])
+            ]);
+        }      
 
-        return redirect()->intended(RouteServiceProvider::HOME); */
+        Auth::login($user, $request->remember);
+        
+        return redirect()->intended(RouteServiceProvider::HOME);
     }
 
     /**
