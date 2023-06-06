@@ -61,8 +61,8 @@ class RegisteredUserController extends Controller
             'Accept' => 'aplication/json'
         ])->post('http://api.codersfree.test/oauth/token', [
             'grant_type' => 'password',
-            'client_id' => '9957a452-c219-4167-b02a-036d97716cc8',
-            'client_secret' => 'ues1nC0PFXVheXv7hitiVb3lU1J2XjGZjw9wJ8JI',
+            'client_id' => config('services.codersfree.client_id'),
+            'client_secret' => config('services.codersfree.client_secret'),
             'username' => $request->email,
             'password' => $request->password,
         ]);
